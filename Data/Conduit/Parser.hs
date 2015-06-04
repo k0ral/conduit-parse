@@ -44,7 +44,7 @@ deriving instance Applicative (ConduitParser i m)
 deriving instance Functor (ConduitParser i m)
 deriving instance (Monad m) => Monad (ConduitParser i m)
 
--- | Parsers can be combined with @(\<|\>)@, 'some', 'many', 'optional', 'choice'.
+-- | Parsers can be combined with ('<|>'), 'some', 'many', 'optional', 'choice'.
 --
 -- The use of 'guard' is not recommended as it generates unhelpful error messages.
 -- Please consider using 'throwM' or 'unexpected' instead.
@@ -101,7 +101,7 @@ instance (MonadCatch m) => Parsing (ConduitParser i m) where
     name <- getParserName
     forM_ result $ \_ -> throwM $ UnexpectedFollowedBy name
 
--- | Flipped version of @(\<?\>)@.
+-- | Flipped version of ('<?>').
 named :: (MonadCatch m) => Text -> ConduitParser i m a -> ConduitParser i m a
 named name = flip (<?>) (unpack name)
 
@@ -111,7 +111,7 @@ named name = flip (<?>) (unpack name)
 runConduitParser :: (MonadThrow m) => ConduitParser i m a -> Sink i m a
 runConduitParser (ConduitParser p) = fst <$> runStateT p (mempty, mempty)
 
--- | Return the name of the parser (assigned through @(\<?\>)@), or 'mempty' if has none.
+-- | Return the name of the parser (assigned through ('<?>')), or 'mempty' if has none.
 getParserName :: ConduitParser i m Text
 getParserName = ConduitParser $ gets fst
 
