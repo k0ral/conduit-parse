@@ -1,6 +1,7 @@
 name:                conduit-parse
 version:             0.1.0.0
 synopsis:            Parsing framework based on conduit.
+description:         Please refer to README.
 homepage:            https://github.com/k0ral/conduit-parse
 license:             OtherLicense
 license-file:        LICENSE
