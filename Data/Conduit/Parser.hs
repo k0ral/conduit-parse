@@ -57,7 +57,8 @@ instance (MonadCatch m) => Alternative (ConduitParser i m) where
     catch parserB $ \(eb :: ConduitParserException) ->
       throwM $ BothFailed ea eb
 
--- | Consumed elements are pushed back with 'leftover' whenever an exception occurs. In other words, backtracking is supported.
+-- | Consumed elements are pushed back with 'leftover' whenever an exception occurs.
+-- In other words, backtracking is supported.
 instance (MonadThrow m) => MonadThrow (ConduitParser i m) where
   throwM e = case fromException (toException e) of
     Just (e' :: ConduitParserException) -> do
