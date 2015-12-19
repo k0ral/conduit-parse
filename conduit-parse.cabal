@@ -19,6 +19,8 @@ source-repository head
 library
   exposed-modules:
     Data.Conduit.Parser
+  other-modules:
+    Data.Conduit.Parser.Internal
   build-depends:
       base >= 4.8 && < 5
     , conduit
