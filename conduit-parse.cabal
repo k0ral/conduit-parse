@@ -1,10 +1,6 @@
 name:                conduit-parse
 version:             0.1.0.0
 synopsis:            Parsing framework based on conduit.
-description:
-  The @conduit-extra@ package provides utilities to turn a 'Parser' into a 'Consumer', but only for streams of 'ByteString's of 'Text's (cf @Data.Conduit.Attoparsec@ module).
-  .
-  This library makes it possible to work with any kind of input by providing a general-purpose parsing framework based on 'conduit'.
 homepage:            https://github.com/k0ral/conduit-parse
 license:             OtherLicense
 license-file:        LICENSE
@@ -13,6 +9,7 @@ maintainer:          koral <koral@mailoo.org>
 category:            Conduit, Text
 build-type:          Simple
 cabal-version:       >=1.10
+extra-source-files:  README.md
 
 source-repository head
     type:     git
