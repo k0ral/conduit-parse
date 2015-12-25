@@ -1,4 +1,5 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE RankNTypes                 #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
@@ -9,63 +10,69 @@ module Data.Conduit.Parser.Internal where
 import           Control.Applicative
 import           Control.Arrow             (second)
 import           Control.Monad
-import           Control.Monad.Catch       as Exception
-import           Control.Monad.Trans.Class
+import           Control.Monad.Catch
+import           Control.Monad.Error.Class
+import           Control.Monad.Except
 import           Control.Monad.Trans.State
 
 import           Data.Conduit              hiding (await, leftover)
 import qualified Data.Conduit              as Conduit
 import qualified Data.Conduit.List         as Conduit
+import           Data.DList
+import           Data.Maybe                (fromMaybe)
 import           Data.Text                 as Text (Text, null, pack, unpack)
 
 import           Text.Parser.Combinators   as Parser
 -- }}}
 
 -- | Core type of the package. This is basically a 'Sink' with a parsing state.
-newtype ConduitParser i m a = ConduitParser (StateT (Text, [i]) (Sink i m) a)
+newtype ConduitParser i m a = ConduitParser (ExceptT ConduitParserException (StateT (Text, Buffer i) (Sink i m)) a)
 
 deriving instance Applicative (ConduitParser i m)
 deriving instance Functor (ConduitParser i m)
-deriving instance (Monad m) => Monad (ConduitParser i m)
+deriving instance Monad (ConduitParser i m)
+deriving instance (MonadCatch m) => MonadCatch (ConduitParser i m)
+deriving instance (MonadIO m) => MonadIO (ConduitParser i m)
+deriving instance (MonadThrow m) => MonadThrow (ConduitParser i m)
+
+instance MonadTrans (ConduitParser i) where
+  lift = ConduitParser . lift . lift . lift
+
+
+-- | Backtracking is supported by pushing back consumed elements (using 'leftover') whenever an error is catched.
+--
+-- As a consequence, within the scope of a `catchError`,
+-- all streamed items are kept in memory,
+-- which means the consumer no longer uses constant memory.
+instance MonadError ConduitParserException (ConduitParser i m) where
+  throwError e = do
+    name <- getParserName
+    if Text.null name
+    then ConduitParser $ throwError e
+    else ConduitParser . throwError $ NamedParserException name e
+  catchError (ConduitParser f) handler = do
+    buffer <- withBuffer resetBuffer
+    withBuffer $ setEnabled True
+
+    result <- ConduitParser $ (Right <$> f) `catchError` (return . Left)
+
+    case result of
+      Left e -> backtrack >> setBuffer buffer >> handler e
+      Right a -> withBuffer (prependBuffer buffer) >> return a
 
 -- | Parsers can be combined with ('<|>'), 'some', 'many', 'optional', 'choice'.
 --
 -- The use of 'guard' is not recommended as it generates unhelpful error messages.
--- Please consider using 'throwM' or 'unexpected' instead.
---
--- Note: only 'ConduitParserException's will trigger the 'Alternative' features, all other exceptions are rethrown.
-instance (MonadCatch m) => Alternative (ConduitParser i m) where
-  empty = throwM $ Unexpected "ConduitParser.empty"
+-- Please consider using 'throwError' or 'unexpected' instead.
+instance Alternative (ConduitParser i m) where
+  empty = ConduitParser $ throwError $ Unexpected "ConduitParser.empty"
 
-  parserA <|> parserB = catch parserA $ \(ea :: ConduitParserException) ->
-    catch parserB $ \(eb :: ConduitParserException) ->
-      throwM $ BothFailed ea eb
-
--- | Consumed elements are pushed back with 'leftover' whenever an exception occurs.
--- In other words, backtracking is supported.
-instance (MonadThrow m) => MonadThrow (ConduitParser i m) where
-  throwM e = case fromException (toException e) of
-    Just (e' :: ConduitParserException) -> do
-      backtrack
-      name <- getParserName
-      if Text.null name
-        then ConduitParser $ throwM e'
-        else ConduitParser . throwM $ NamedParserException name e'
-    _ -> ConduitParser $ throwM e
-
-instance (MonadCatch m) => MonadCatch (ConduitParser i m) where
-  catch (ConduitParser f) handler = do
-    buffer <- resetBuffer
-    result <- ConduitParser $ Exception.try f
-    case result of
-      Right a -> prependBuffer buffer >> return a
-      Left e -> prependBuffer buffer >> handler e
-
-instance MonadTrans (ConduitParser i) where
-  lift = ConduitParser . lift . lift
+  parserA <|> parserB = catchError parserA $ \ea ->
+    catchError parserB $ \eb ->
+      throwError $ BothFailed ea eb
 
 -- | Parsing combinators can be used with 'ConduitParser's.
-instance (MonadCatch m) => Parsing (ConduitParser i m) where
+instance (Monad m) => Parsing (ConduitParser i m) where
   try parser = parser
 
   parser <?> name = do
@@ -75,69 +82,96 @@ instance (MonadCatch m) => Parsing (ConduitParser i m) where
     setParserName oldName
     return a
 
-  unexpected = throwM . Unexpected . pack
+  unexpected = throwError . Unexpected . pack
 
   eof = do
     result <- peek
-    maybe (return ()) (const $ throwM ExpectedEndOfInput) result
+    maybe (return ()) (const $ throwError ExpectedEndOfInput) result
 
   notFollowedBy parser = do
     result <- optional parser
     name <- getParserName
-    forM_ result $ \_ -> throwM $ UnexpectedFollowedBy name
+    forM_ result $ \_ -> throwError $ UnexpectedFollowedBy name
 
 -- | Flipped version of ('<?>').
-named :: (MonadCatch m) => Text -> ConduitParser i m a -> ConduitParser i m a
+named :: (Monad m) => Text -> ConduitParser i m a -> ConduitParser i m a
 named name = flip (<?>) (unpack name)
 
 
 -- | Run a 'ConduitParser'.
 -- Any parsing failure will be thrown as an exception.
 runConduitParser :: (MonadThrow m) => ConduitParser i m a -> Sink i m a
-runConduitParser (ConduitParser p) = fst <$> runStateT p (mempty, mempty)
+runConduitParser (ConduitParser p) = either throwM return . fst =<< runStateT (runExceptT p) (mempty, mempty)
 
 -- | Return the name of the parser (assigned through ('<?>')), or 'mempty' if has none.
 getParserName :: ConduitParser i m Text
-getParserName = ConduitParser $ gets fst
+getParserName = ConduitParser $ lift $ gets fst
 
 setParserName :: Text -> ConduitParser i m ()
-setParserName name = ConduitParser . modify $ \(_, b) -> (name, b)
+setParserName name = ConduitParser $ lift $ modify $ \(_, b) -> (name, b)
 
-getBuffer :: ConduitParser i m [i]
-getBuffer = ConduitParser $ gets snd
+getBuffer :: ConduitParser i m (Buffer i)
+getBuffer = ConduitParser $ lift $ gets snd
 
-appendBuffer :: [i] -> ConduitParser i m ()
-appendBuffer new = ConduitParser $ modify (\(n, b) -> (n, b ++ new))
+setBuffer :: Buffer i -> ConduitParser i m (Buffer i)
+setBuffer buffer = withBuffer (const buffer)
 
-prependBuffer :: [i] -> ConduitParser i m ()
-prependBuffer new = ConduitParser $ modify (second (new ++))
+withBuffer :: (Buffer i -> Buffer i) -> ConduitParser i m (Buffer i)
+withBuffer f = do
+  buffer <- ConduitParser $ lift $ gets snd
+  ConduitParser $ lift $ modify (second f)
+  return buffer
 
-resetBuffer :: (Monad m) => ConduitParser i m [i]
-resetBuffer = do
-  b <- getBuffer
-  ConduitParser $ modify (\(n, _) -> (n, mempty))
-  return b
+backtrack :: ConduitParser i m ()
+backtrack = mapM_ leftover =<< withBuffer resetBuffer
 
-backtrack :: (Monad m) => ConduitParser i m ()
-backtrack = mapM_ leftover . reverse =<< resetBuffer
+
+newtype Buffer i = Buffer (Maybe (DList i)) deriving(Monoid)
+
+deriving instance (Show i) => Show (Buffer i)
+
+instance Functor Buffer where
+  fmap _ (Buffer Nothing) = Buffer mempty
+  fmap f (Buffer (Just a)) = Buffer $ Just $ fmap f a
+
+instance Foldable Buffer where
+  foldMap _ (Buffer Nothing) = mempty
+  foldMap f (Buffer (Just a)) = foldMap f a
+
+
+setEnabled :: Bool -> Buffer i -> Buffer i
+setEnabled True (Buffer a) = Buffer (a <|> Just mempty)
+setEnabled _ (Buffer _) = Buffer mempty
+
+prependItem :: i -> Buffer i -> Buffer i
+prependItem new (Buffer a) = Buffer $ fmap (cons new) a
+
+-- Warning: this function is asymetric
+prependBuffer :: Buffer i -> Buffer i -> Buffer i
+prependBuffer (Buffer a) (Buffer b) = case a of
+  Just a' -> Buffer $ Just (fromMaybe mempty b `append` a')
+  _ -> Buffer a
+
+resetBuffer :: Buffer i -> Buffer i
+resetBuffer (Buffer a) = Buffer $ fmap (const mempty) a
 
 -- | 'Conduit.await' wrapped as a 'ConduitParser'.
 --
 -- If no data is available, 'UnexpectedEndOfInput' is thrown.
-await :: (MonadCatch m) => ConduitParser i m i
+await :: (Monad m) => ConduitParser i m i
 await = do
-  event <- ConduitParser . lift $ Conduit.await
-  e     <- maybe (throwM UnexpectedEndOfInput) return event
-  appendBuffer [e]
+  event <- ConduitParser $ lift $ lift Conduit.await
+  e     <- maybe (throwError UnexpectedEndOfInput) return event
+  withBuffer $ prependItem e
   return e
 
 -- | 'Conduit.leftover' wrapped as a 'ConduitParser'.
-leftover :: (Monad m) => i -> ConduitParser i m ()
-leftover = ConduitParser . lift . Conduit.leftover
+leftover :: i -> ConduitParser i m ()
+leftover = ConduitParser . lift . lift . Conduit.leftover
 
 -- | 'Conduit.peek' wrapped as a 'ConduitParser'.
 peek :: (Monad m) => ConduitParser i m (Maybe i)
-peek = ConduitParser . lift $ Conduit.peek
+peek = ConduitParser $ lift $ lift Conduit.peek
 
 
 data ConduitParserException = BothFailed ConduitParserException ConduitParserException

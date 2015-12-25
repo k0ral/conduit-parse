@@ -24,7 +24,9 @@ library
   build-depends:
       base >= 4.8 && < 5
     , conduit
+    , dlist
     , exceptions
+    , mtl
     , parsers
     , text
     , transformers
@@ -41,6 +43,7 @@ test-suite tests
     , conduit-parse
     , exceptions
     , hlint
+    , mtl
     , parsers
     , resourcet
     , tasty

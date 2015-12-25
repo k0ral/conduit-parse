@@ -2,6 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 import           Control.Applicative
 import           Control.Monad.Catch          as Exception
+import           Control.Monad.Error.Class
 import           Control.Monad.Trans.Resource
 
 import           Data.Conduit                 hiding (await, leftover)
@@ -43,8 +44,8 @@ hlint = testCase "HLint check" $ do
 awaitCase :: TestTree
 awaitCase = testCase "await" $ do
   i <- runResourceT . runConduit $ sourceList [1 :: Int] =$= runConduitParser parser
-  i @=? (1, Left UnexpectedEndOfInput)
-  where parser = (,) <$> await <*> Exception.try await
+  i @=? (1, Nothing)
+  where parser = (,) <$> await <*> optional await
 
 peekCase :: TestTree
 peekCase = testCase "peek" $ do
@@ -72,7 +73,7 @@ alternativeCase = testCase "alternative" $ do
           await
           eof
           return (a, b, c)
-        parseInt :: (MonadCatch m) => Int -> ConduitParser Int m Int
+        parseInt :: (Monad m) => Int -> ConduitParser Int m Int
         parseInt i = do
           a <- await
           if i == a then return a else unexpected ("Expected " ++ show i ++ ", got " ++ show a)
@@ -81,7 +82,7 @@ catchCase :: TestTree
 catchCase = testCase "catch" $ do
   result <- runResourceT . runConduit $ sourceList [1 :: Int, 2] =$= runConduitParser parser
   result @=? (1, 2)
-  where parser = catchAll (await >> await >> throwM (Unexpected "ERROR")) . const $ (,) <$> await <*> await
+  where parser = catchError (await >> await >> throwError (Unexpected "ERROR")) . const $ (,) <$> await <*> await
 
 parsingCase :: TestTree
 parsingCase = testCase "parsing" $ do
