@@ -31,6 +31,7 @@ unitTests = testGroup "Unit tests"
   [ awaitCase
   , peekCase
   , leftoverCase
+  , errorCase
   , alternativeCase
   , catchCase
   , parsingCase
@@ -61,6 +62,15 @@ leftoverCase = testCase "leftover" $ do
           (a, b, c) <- (,,) <$> await <*> await <*> await
           leftover a >> leftover b >> leftover c
           (,,) <$> await <*> await <*> await
+
+errorCase :: TestTree
+errorCase = testCase "error" $ do
+  result1 <- Exception.try . runResourceT . runConduit $ sourceList [] =$= runConduitParser (parser <?> "Unexpected error")
+  result2 <- Exception.try . runResourceT . runConduit $ sourceList [] =$= runConduitParser parser
+  result1 @=? Left (NamedParserException "Unexpected error" $ Unexpected "ERROR")
+  result2 @=? Left (Unexpected "ERROR")
+  where parser = unexpected "ERROR" >> return (1 :: Int)
+
 
 alternativeCase :: TestTree
 alternativeCase = testCase "alternative" $ do
