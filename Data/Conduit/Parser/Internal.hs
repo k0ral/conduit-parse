@@ -185,9 +185,9 @@ deriving instance Eq ConduitParserException
 deriving instance Show ConduitParserException
 
 instance Exception ConduitParserException where
-  displayException (BothFailed ea eb) = show ea ++ "\n" ++ show eb
+  displayException (BothFailed ea eb) = displayException ea ++ "\n" ++ displayException eb
   displayException ExpectedEndOfInput = "Unexpected input, expected end of input."
-  displayException (NamedParserException t e) = "While parsing " ++ unpack t ++ ": " ++ show e
+  displayException (NamedParserException t e) = "While parsing " ++ unpack t ++ ":\n" ++ displayException e
   displayException UnexpectedEndOfInput = "Unexpected end of input."
   displayException (UnexpectedFollowedBy t) = "Should not be followed by " ++ unpack t
   displayException (Unexpected t) = unpack t
