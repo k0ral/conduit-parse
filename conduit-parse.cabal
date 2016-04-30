@@ -1,5 +1,5 @@
 name:                conduit-parse
-version:             0.1.1.0
+version:             0.1.1.1
 synopsis:            Parsing framework based on conduit.
 description:         Please refer to README.
 homepage:            https://github.com/k0ral/conduit-parse
@@ -13,8 +13,8 @@ cabal-version:       >=1.10
 extra-source-files:  README.md
 
 source-repository head
-    type:     git
-    location: git://github.com/k0ral/conduit-parse.git
+  type:     git
+  location: git://github.com/k0ral/conduit-parse.git
 
 library
   exposed-modules:
