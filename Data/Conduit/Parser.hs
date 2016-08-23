@@ -9,6 +9,7 @@ module Data.Conduit.Parser
     -- * Primitives
   , await
   , leftover
+  , getParserNames
   , getParserName
     -- * Utility
   , peek

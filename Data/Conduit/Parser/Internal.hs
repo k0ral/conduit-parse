@@ -8,25 +8,27 @@ module Data.Conduit.Parser.Internal where
 
 -- {{{ Imports
 import           Control.Applicative
-import           Control.Arrow             (second)
 import           Control.Monad
 import           Control.Monad.Catch
 import           Control.Monad.Error.Class
 import           Control.Monad.Except
 import           Control.Monad.Trans.State
 
+import           Data.Bifunctor
 import           Data.Conduit              hiding (await, leftover)
 import qualified Data.Conduit              as Conduit
 import qualified Data.Conduit.List         as Conduit
-import           Data.DList
+import           Data.DList                (DList (..), append, cons)
 import           Data.Maybe                (fromMaybe)
-import           Data.Text                 as Text (Text, null, pack, unpack)
+import           Data.Text                 as Text (Text, pack, unpack)
+
+import           Safe
 
 import           Text.Parser.Combinators   as Parser
 -- }}}
 
 -- | Core type of the package. This is basically a 'Sink' with a parsing state.
-newtype ConduitParser i m a = ConduitParser (ExceptT ConduitParserException (StateT (Text, Buffer i) (Sink i m)) a)
+newtype ConduitParser i m a = ConduitParser (ExceptT ConduitParserException (StateT ([Text], Buffer i) (Sink i m)) a)
 
 deriving instance Applicative (ConduitParser i m)
 deriving instance Functor (ConduitParser i m)
@@ -46,10 +48,9 @@ instance MonadTrans (ConduitParser i) where
 -- which means the consumer no longer uses constant memory.
 instance MonadError ConduitParserException (ConduitParser i m) where
   throwError e = do
-    name <- getParserName
-    if Text.null name
-    then ConduitParser $ throwError e
-    else ConduitParser . throwError $ NamedParserException name e
+    names <- getParserNames
+    ConduitParser . throwError $ foldr NamedParserException e $ reverse names
+
   catchError (ConduitParser f) handler = do
     buffer <- withBuffer resetBuffer
     withBuffer $ setEnabled True
@@ -76,10 +77,9 @@ instance (Monad m) => Parsing (ConduitParser i m) where
   try parser = parser
 
   parser <?> name = do
-    oldName <- getParserName
-    setParserName $ pack name
+    pushParserName $ pack name
     a <- parser
-    setParserName oldName
+    popParserName
     return a
 
   unexpected = throwError . Unexpected . pack
@@ -103,12 +103,19 @@ named name = flip (<?>) (unpack name)
 runConduitParser :: (MonadThrow m) => ConduitParser i m a -> Sink i m a
 runConduitParser (ConduitParser p) = either throwM return . fst =<< runStateT (runExceptT p) (mempty, mempty)
 
--- | Return the name of the parser (assigned through ('<?>')), or 'mempty' if has none.
-getParserName :: ConduitParser i m Text
-getParserName = ConduitParser $ lift $ gets fst
+-- | Return the ordered list of names (assigned through ('<?>')) for the current parser stack. First element is the most nested parser.
+getParserNames :: ConduitParser i m [Text]
+getParserNames = ConduitParser $ lift $ gets fst
 
-setParserName :: Text -> ConduitParser i m ()
-setParserName name = ConduitParser $ lift $ modify $ \(_, b) -> (name, b)
+-- | Return the name (assigned through ('<?>')) of the current parser (most nested), or 'mempty' if it has none.
+getParserName :: ConduitParser i m Text
+getParserName = ConduitParser $ lift $ gets (headDef "" . fst)
+
+pushParserName :: Text -> ConduitParser i m ()
+pushParserName name = ConduitParser $ lift $ modify $ first (name :)
+
+popParserName ::  ConduitParser i m ()
+popParserName = ConduitParser $ lift $ modify $ first tailSafe
 
 getBuffer :: ConduitParser i m (Buffer i)
 getBuffer = ConduitParser $ lift $ gets snd

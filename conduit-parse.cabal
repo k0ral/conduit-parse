@@ -28,6 +28,7 @@ library
     , exceptions
     , mtl
     , parsers
+    , safe
     , text
     , transformers
   default-language: Haskell2010

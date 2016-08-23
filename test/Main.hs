@@ -65,10 +65,12 @@ leftoverCase = testCase "leftover" $ do
 
 errorCase :: TestTree
 errorCase = testCase "error" $ do
-  result1 <- Exception.try . runResourceT . runConduit $ sourceList [] =$= runConduitParser (parser <?> "Unexpected error")
-  result2 <- Exception.try . runResourceT . runConduit $ sourceList [] =$= runConduitParser parser
-  result1 @=? Left (NamedParserException "Unexpected error" $ Unexpected "ERROR")
-  result2 @=? Left (Unexpected "ERROR")
+  result1 <- Exception.try . runResourceT . runConduit $ sourceList [] =$= runConduitParser parser
+  result2 <- Exception.try . runResourceT . runConduit $ sourceList [] =$= runConduitParser (parser <?> "Name1")
+  result3 <- Exception.try . runResourceT . runConduit $ sourceList [] =$= runConduitParser ((parser <?> "Name1") <?> "Name2")
+  result1 @=? Left (Unexpected "ERROR")
+  result2 @=? Left (NamedParserException "Name1" $ Unexpected "ERROR")
+  result3 @=? Left (NamedParserException "Name2" $ NamedParserException "Name1" $ Unexpected "ERROR")
   where parser = unexpected "ERROR" >> return (1 :: Int)
 
 
