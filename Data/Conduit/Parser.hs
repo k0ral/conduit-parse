@@ -17,4 +17,4 @@ module Data.Conduit.Parser
   , ConduitParserException(..)
   ) where
 
-import Data.Conduit.Parser.Internal
+import           Data.Conduit.Parser.Internal

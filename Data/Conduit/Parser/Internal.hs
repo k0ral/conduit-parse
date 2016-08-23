@@ -58,7 +58,7 @@ instance MonadError ConduitParserException (ConduitParser i m) where
     result <- ConduitParser $ (Right <$> f) `catchError` (return . Left)
 
     case result of
-      Left e -> backtrack >> setBuffer buffer >> handler e
+      Left e  -> backtrack >> setBuffer buffer >> handler e
       Right a -> withBuffer (prependBuffer buffer) >> return a
 
 -- | Parsers can be combined with ('<|>'), 'some', 'many', 'optional', 'choice'.
@@ -138,17 +138,17 @@ newtype Buffer i = Buffer (Maybe (DList i)) deriving(Monoid)
 deriving instance (Show i) => Show (Buffer i)
 
 instance Functor Buffer where
-  fmap _ (Buffer Nothing) = Buffer mempty
+  fmap _ (Buffer Nothing)  = Buffer mempty
   fmap f (Buffer (Just a)) = Buffer $ Just $ fmap f a
 
 instance Foldable Buffer where
-  foldMap _ (Buffer Nothing) = mempty
+  foldMap _ (Buffer Nothing)  = mempty
   foldMap f (Buffer (Just a)) = foldMap f a
 
 
 setEnabled :: Bool -> Buffer i -> Buffer i
 setEnabled True (Buffer a) = Buffer (a <|> Just mempty)
-setEnabled _ (Buffer _) = Buffer mempty
+setEnabled _ (Buffer _)    = Buffer mempty
 
 prependItem :: i -> Buffer i -> Buffer i
 prependItem new (Buffer a) = Buffer $ fmap (cons new) a
@@ -157,7 +157,7 @@ prependItem new (Buffer a) = Buffer $ fmap (cons new) a
 prependBuffer :: Buffer i -> Buffer i -> Buffer i
 prependBuffer (Buffer a) (Buffer b) = case a of
   Just a' -> Buffer $ Just (fromMaybe mempty b `append` a')
-  _ -> Buffer a
+  _       -> Buffer a
 
 resetBuffer :: Buffer i -> Buffer i
 resetBuffer (Buffer a) = Buffer $ fmap (const mempty) a
