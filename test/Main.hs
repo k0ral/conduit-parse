@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedLists   #-}
 {-# LANGUAGE OverloadedStrings #-}
 import           Control.Applicative
-import           Control.Monad.Catch          as Exception
+import           Control.Exception.Safe       as Exception
 import           Control.Monad.Error.Class
 import           Control.Monad.Trans.Resource
 

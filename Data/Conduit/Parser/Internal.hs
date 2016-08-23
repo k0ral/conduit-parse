@@ -8,8 +8,8 @@ module Data.Conduit.Parser.Internal where
 
 -- {{{ Imports
 import           Control.Applicative
+import           Control.Exception.Safe
 import           Control.Monad
-import           Control.Monad.Catch
 import           Control.Monad.Error.Class
 import           Control.Monad.Except
 import           Control.Monad.Trans.State

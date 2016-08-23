@@ -25,7 +25,7 @@ library
       base >= 4.8 && < 5
     , conduit
     , dlist
-    , exceptions
+    , safe-exceptions
     , mtl
     , parsers
     , safe
@@ -42,7 +42,7 @@ test-suite tests
       base >= 4.8 && < 5
     , conduit
     , conduit-parse
-    , exceptions
+    , safe-exceptions
     , hlint
     , mtl
     , parsers
