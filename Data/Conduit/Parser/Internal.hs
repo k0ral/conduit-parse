@@ -4,7 +4,7 @@
 {-# LANGUAGE RankNTypes                 #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE StandaloneDeriving         #-}
-module Data.Conduit.Parser.Internal where
+module Data.Conduit.Parser.Internal (module Data.Conduit.Parser.Internal) where
 
 -- {{{ Imports
 import           Control.Applicative
@@ -30,8 +30,8 @@ import           Text.Parser.Combinators   as Parser
 -- | Core type of the package. This is basically a 'Sink' with a parsing state.
 newtype ConduitParser i m a = ConduitParser (ExceptT ConduitParserException (StateT ([Text], Buffer i) (Sink i m)) a)
 
-deriving instance Applicative (ConduitParser i m)
 deriving instance Functor (ConduitParser i m)
+deriving instance Applicative (ConduitParser i m)
 deriving instance Monad (ConduitParser i m)
 deriving instance (MonadCatch m) => MonadCatch (ConduitParser i m)
 deriving instance (MonadIO m) => MonadIO (ConduitParser i m)
