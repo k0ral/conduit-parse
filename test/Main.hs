@@ -4,15 +4,9 @@ import           Control.Applicative
 import           Control.Exception.Safe       as Exception
 import           Control.Monad.Error.Class
 import           Control.Monad.Trans.Resource
-
 import           Data.Conduit                 hiding (await, leftover)
-import           Data.Conduit.List            hiding (drop, peek)
+import           Data.Conduit.List            hiding (peek)
 import           Data.Conduit.Parser
-
-import qualified Language.Haskell.HLint       as HLint (hlint)
-
-import           Prelude                      hiding (drop)
-
 import           Test.Tasty
 import           Test.Tasty.HUnit
 -- import           Test.Tasty.QuickCheck
@@ -23,7 +17,6 @@ main :: IO ()
 main = defaultMain $ testGroup "Tests"
   [ unitTests
   -- , properties
-  , hlint
   ]
 
 unitTests :: TestTree
@@ -36,11 +29,6 @@ unitTests = testGroup "Unit tests"
   , catchCase
   , parsingCase
   ]
-
-hlint :: TestTree
-hlint = testCase "HLint check" $ do
-  result <- HLint.hlint [ "test/", "Data/" ]
-  null result @?= True
 
 awaitCase :: TestTree
 awaitCase = testCase "await" $ do
