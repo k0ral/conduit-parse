@@ -32,19 +32,19 @@ unitTests = testGroup "Unit tests"
 
 awaitCase :: TestTree
 awaitCase = testCase "await" $ do
-  i <- runResourceT . runConduit $ sourceList [1 :: Int] =$= runConduitParser parser
+  i <- runResourceT . runConduit $ sourceList [1 :: Int] .| runConduitParser parser
   i @=? (1, Nothing)
   where parser = (,) <$> await <*> optional await
 
 peekCase :: TestTree
 peekCase = testCase "peek" $ do
-  result <- runResourceT . runConduit $ sourceList [1 :: Int, 2] =$= runConduitParser parser
+  result <- runResourceT . runConduit $ sourceList [1 :: Int, 2] .| runConduitParser parser
   result @=? (Just 1, 1, 2, Nothing)
   where parser = (,,,) <$> peek <*> await <*> await <*> peek
 
 leftoverCase :: TestTree
 leftoverCase = testCase "leftover" $ do
-  result <- runResourceT . runConduit $ sourceList [1 :: Int, 2, 3] =$= runConduitParser parser
+  result <- runResourceT . runConduit $ sourceList [1 :: Int, 2, 3] .| runConduitParser parser
   result @?= (3, 2, 1)
   where parser = do
           (a, b, c) <- (,,) <$> await <*> await <*> await
@@ -53,9 +53,9 @@ leftoverCase = testCase "leftover" $ do
 
 errorCase :: TestTree
 errorCase = testCase "error" $ do
-  result1 <- Exception.try . runResourceT . runConduit $ sourceList [] =$= runConduitParser parser
-  result2 <- Exception.try . runResourceT . runConduit $ sourceList [] =$= runConduitParser (parser <?> "Name1")
-  result3 <- Exception.try . runResourceT . runConduit $ sourceList [] =$= runConduitParser ((parser <?> "Name1") <?> "Name2")
+  result1 <- Exception.try . runResourceT . runConduit $ sourceList [] .| runConduitParser parser
+  result2 <- Exception.try . runResourceT . runConduit $ sourceList [] .| runConduitParser (parser <?> "Name1")
+  result3 <- Exception.try . runResourceT . runConduit $ sourceList [] .| runConduitParser ((parser <?> "Name1") <?> "Name2")
   result1 @?= Left (Unexpected "ERROR")
   result2 @?= Left (NamedParserException "Name1" $ Unexpected "ERROR")
   result3 @?= Left (NamedParserException "Name2" $ NamedParserException "Name1" $ Unexpected "ERROR")
@@ -64,7 +64,7 @@ errorCase = testCase "error" $ do
 
 alternativeCase :: TestTree
 alternativeCase = testCase "alternative" $ do
-  result <- runResourceT . runConduit $ sourceList [1 :: Int, 2, 3] =$= runConduitParser parser
+  result <- runResourceT . runConduit $ sourceList [1 :: Int, 2, 3] .| runConduitParser parser
   result @?= (1, 2, Nothing)
   where parser = do
           a <- parseInt 1 <|> parseInt 2
@@ -80,12 +80,12 @@ alternativeCase = testCase "alternative" $ do
 
 catchCase :: TestTree
 catchCase = testCase "catch" $ do
-  result <- runResourceT . runConduit $ sourceList [1 :: Int, 2] =$= runConduitParser parser
+  result <- runResourceT . runConduit $ sourceList [1 :: Int, 2] .| runConduitParser parser
   result @?= (1, 2)
   where parser = catchError (await >> await >> throwError (Unexpected "ERROR")) . const $ (,) <$> await <*> await
 
 parsingCase :: TestTree
 parsingCase = testCase "parsing" $ do
-  result <- runResourceT . runConduit $ sourceList [1 :: Int, 2] =$= runConduitParser parser
+  result <- runResourceT . runConduit $ sourceList [1 :: Int, 2] .| runConduitParser parser
   result @?= (1, 2)
   where parser = (,) <$> await <*> await <* notFollowedBy await <* eof

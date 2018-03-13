@@ -7,8 +7,10 @@
 module Data.Conduit.Parser.Internal (module Data.Conduit.Parser.Internal) where
 
 -- {{{ Imports
+import qualified Conduit
+
 import           Control.Applicative
-import           Control.Exception.Safe
+import           Control.Exception.Safe    as Exception
 import           Control.Monad
 import           Control.Monad.Error.Class
 import           Control.Monad.Except
@@ -16,7 +18,6 @@ import           Control.Monad.Trans.State
 
 import           Data.Bifunctor
 import           Data.Conduit              hiding (await, leftover)
-import qualified Data.Conduit              as Conduit
 import qualified Data.Conduit.List         as Conduit
 import           Data.DList                (DList (..), append, cons)
 import           Data.Maybe                (fromMaybe)
@@ -28,12 +29,11 @@ import           Text.Parser.Combinators   as Parser
 -- }}}
 
 -- | Core type of the package. This is basically a 'Sink' with a parsing state.
-newtype ConduitParser i m a = ConduitParser (ExceptT ConduitParserException (StateT ([Text], Buffer i) (Sink i m)) a)
+newtype ConduitParser i m a = ConduitParser (ExceptT ConduitParserException (StateT ([Text], Buffer i) (ConduitT i Void m)) a)
 
 deriving instance Functor (ConduitParser i m)
 deriving instance Applicative (ConduitParser i m)
 deriving instance Monad (ConduitParser i m)
-deriving instance (MonadCatch m) => MonadCatch (ConduitParser i m)
 deriving instance (MonadIO m) => MonadIO (ConduitParser i m)
 deriving instance (MonadThrow m) => MonadThrow (ConduitParser i m)
 
@@ -100,7 +100,7 @@ named name = flip (<?>) (unpack name)
 
 -- | Run a 'ConduitParser'.
 -- Any parsing failure will be thrown as an exception.
-runConduitParser :: (MonadThrow m) => ConduitParser i m a -> Sink i m a
+runConduitParser :: (MonadThrow m) => ConduitParser i m a -> ConduitT i Void m a
 runConduitParser (ConduitParser p) = either throwM return . fst =<< runStateT (runExceptT p) (mempty, mempty)
 
 -- | Return the ordered list of names (assigned through ('<?>')) for the current parser stack. First element is the most nested parser.
