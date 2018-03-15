@@ -21,6 +21,7 @@ import           Data.Conduit              hiding (await, leftover)
 import qualified Data.Conduit.List         as Conduit
 import           Data.DList                (DList (..), append, cons)
 import           Data.Maybe                (fromMaybe)
+import           Data.Semigroup
 import           Data.Text                 as Text (Text, pack, unpack)
 
 import           Safe
@@ -133,8 +134,10 @@ backtrack :: ConduitParser i m ()
 backtrack = mapM_ leftover =<< withBuffer resetBuffer
 
 
-newtype Buffer i = Buffer (Maybe (DList i)) deriving(Monoid)
+newtype Buffer i = Buffer (Maybe (DList i))
 
+deriving instance Semigroup (Buffer i)
+deriving instance Monoid (Buffer i)
 deriving instance (Show i) => Show (Buffer i)
 
 instance Functor Buffer where
