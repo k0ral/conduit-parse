@@ -13,7 +13,9 @@ import           Control.Applicative
 import           Control.Exception.Safe    as Exception
 import           Control.Monad
 import           Control.Monad.Error.Class
-import           Control.Monad.Except
+import           Control.Monad.IO.Class    (MonadIO)
+import           Control.Monad.Trans.Class (MonadTrans(..))
+import           Control.Monad.Trans.Except (ExceptT, runExceptT)
 import           Control.Monad.Trans.State
 
 import           Data.Bifunctor
