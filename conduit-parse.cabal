@@ -1,5 +1,5 @@
 name:                conduit-parse
-version:             0.2.1.0
+version:             0.2.1.1
 synopsis:            Parsing framework based on conduit.
 description:         Please refer to README.
 homepage:            https://github.com/k0ral/conduit-parse
