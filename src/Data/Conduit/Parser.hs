@@ -3,7 +3,7 @@
 -- You probably want to import the "Text.Parser.Combinators" module together with this module.
 module Data.Conduit.Parser
   ( -- * Conduit parser monad
-    ConduitParser()
+    ConduitParser(..)
   , runConduitParser
   , named
     -- * Primitives
