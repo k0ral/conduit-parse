@@ -39,6 +39,7 @@ deriving instance Applicative (ConduitParser i m)
 deriving instance Monad (ConduitParser i m)
 deriving instance (MonadIO m) => MonadIO (ConduitParser i m)
 deriving instance (MonadThrow m) => MonadThrow (ConduitParser i m)
+deriving instance (MonadCatch m) => MonadCatch (ConduitParser i m)
 
 instance MonadTrans (ConduitParser i) where
   lift = ConduitParser . lift . lift . lift
